@@ -54,11 +54,27 @@ class AppleMusicSongInterface:
             song_id=song_metadata["id"],
         )
 
-        if song_metadata["attributes"]["playParams"].get("isLibrary"):
-            log.debug("library_song_no_lyrics")
-            return None
+        play_params = song_metadata["attributes"].get("playParams") or {}
+        if play_params.get("isLibrary"):
+            # Library songs carry no lyrics relationship; resolve the matching
+            # catalog song (via playParams.catalogId) and read lyrics from it.
+            catalog_id = play_params.get("catalogId")
+            if not catalog_id:
+                log.debug("library_song_no_catalog_id")
+                return None
+            try:
+                song_metadata = (
+                    await self.base.apple_music_api.get_song(catalog_id)
+                )["data"][0]
+            except Exception as exc:
+                log.debug(
+                    "library_song_catalog_lookup_failed",
+                    catalog_id=catalog_id,
+                    error=str(exc),
+                )
+                return None
 
-        if not song_metadata["attributes"]["hasLyrics"]:
+        if not song_metadata["attributes"].get("hasLyrics"):
             log.debug("no_lyrics")
             return None
 

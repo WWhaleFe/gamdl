@@ -239,6 +239,8 @@ async def main(config: CliConfig):
         urls = config.urls
 
     error_count = 0
+    success_count = 0
+    skip_count = 0
     for url_index, url in enumerate(urls, 1):
         url_log = logger.bind(action=f"URL {url_index:>3}/{len(urls):<3}")
 
@@ -289,11 +291,21 @@ async def main(config: CliConfig):
                     GamdlDownloaderDependencyNotFoundError,
                     GamdlInterfaceFlatFilterExcludedError,
                 ) as e:
+                    skip_count += 1
                     track_log.warning(f'Skipping "{media_title}": {e}')
                     continue
                 except Exception as e:
                     error_count += 1
                     track_log.exception(f'Error downloading "{media_title}"')
+                    continue
+                else:
+                    success_count += 1
+                    if download_item.final_path:
+                        track_log.info(
+                            f'Downloaded "{media_title}" -> {download_item.final_path}'
+                        )
+                    else:
+                        track_log.info(f'Downloaded "{media_title}"')
 
                 if (
                     database
@@ -312,4 +324,7 @@ async def main(config: CliConfig):
             error_count += 1
             continue
 
-    logger.info(f"Finished with {error_count} error(s)")
+    logger.info(
+        f"Finished with {error_count} error(s): "
+        f"{success_count} downloaded, {skip_count} skipped"
+    )
