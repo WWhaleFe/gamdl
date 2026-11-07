@@ -56,6 +56,11 @@ class AppleMusicBaseInterface:
         self.drm_backend = drm_backend
         self.cdm = cdm
         self.wrapper_api = wrapper_api
+        # Podfill patch: optional async/sync callable(media) run right after the
+        # tags are known and BEFORE stream info / license exchange. The downloader
+        # uses it to skip tracks whose file already exists without touching the
+        # (rate-limited) license endpoint. It may raise to abort the track.
+        self.pre_stream_filter = None
 
     @staticmethod
     def create_cdm(

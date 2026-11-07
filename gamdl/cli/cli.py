@@ -222,6 +222,8 @@ async def main(config: CliConfig):
         no_synced_lyrics=config.no_synced_lyrics,
         synced_lyrics_only=config.synced_lyrics_only,
     )
+    # Podfill patch: skip already-downloaded songs before the license exchange.
+    base_interface.pre_stream_filter = downloader.raise_if_song_file_exists
 
     if config.read_urls_as_txt:
         urls_from_file = []
@@ -297,6 +299,8 @@ async def main(config: CliConfig):
                 except Exception as e:
                     error_count += 1
                     track_log.exception(f'Error downloading "{media_title}"')
+                    if config.track_delay > 0 and not download_item.media.partial:
+                        await asyncio.sleep(config.track_delay)
                     continue
                 else:
                     success_count += 1
@@ -316,6 +320,10 @@ async def main(config: CliConfig):
                         download_item.media.media_metadata["id"],
                         download_item.final_path,
                     )
+
+                # Podfill patch: pause between real tracks to stay under Apple's rate limits
+                if config.track_delay > 0 and not download_item.media.partial:
+                    await asyncio.sleep(config.track_delay)
         except GamdlInterfaceUrlParseError as e:
             url_log.error(f"{e}")
             continue

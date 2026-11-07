@@ -637,10 +637,6 @@ class AppleMusicSongInterface:
                 media.index,
             )
 
-        media.cover = await self.base.get_cover(media.media_metadata)
-
-        media.lyrics = await self.get_lyrics(media.media_metadata)
-
         if self.base.wrapper_api:
             playback = (
                 await self.base.wrapper_api.get_playback(media.media_id)
@@ -663,18 +659,30 @@ class AppleMusicSongInterface:
                 media.is_library,
             )
 
-        if playback:
-            media.tags = await self.base.get_tags_from_asset_info(
-                playback["songList"][0]["assets"][0]["metadata"],
-                media.lyrics.unsynced if media.lyrics else None,
-                self.use_album_date,
-            )
-        else:
-            media.tags = await self.base.get_tags_from_asset_info(
-                webplayback["songList"][0]["assets"][0]["metadata"],
-                media.lyrics.unsynced if media.lyrics else None,
-                self.use_album_date,
-            )
+        asset_metadata = (
+            playback["songList"][0]["assets"][0]["metadata"]
+            if playback
+            else webplayback["songList"][0]["assets"][0]["metadata"]
+        )
+        # Podfill patch: build the tags first (they decide the final file path),
+        # then let the downloader skip the track early if the file already exists.
+        # Cover, lyrics, stream info and the license exchange come after.
+        media.tags = await self.base.get_tags_from_asset_info(
+            asset_metadata,
+            None,
+            self.use_album_date,
+        )
+
+        if self.base.pre_stream_filter:
+            result = self.base.pre_stream_filter(media)
+            if asyncio.iscoroutine(result):
+                await result
+
+        media.cover = await self.base.get_cover(media.media_metadata)
+
+        media.lyrics = await self.get_lyrics(media.media_metadata)
+        if media.lyrics and media.lyrics.unsynced:
+            media.tags.lyrics = media.lyrics.unsynced
 
         if not self.skip_stream_info:
             media.stream_info = await self.get_stream_info(

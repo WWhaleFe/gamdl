@@ -472,6 +472,15 @@ class CliConfig:
         ),
     ]
     # Downloader specific options
+    track_delay: Annotated[
+        float,
+        option(
+            "--track-delay",
+            help="Seconds to wait after each downloaded/failed track (eases Apple rate limits)",
+            default=0.0,
+            type=float,
+        ),
+    ]
     overwrite: Annotated[
         bool,
         option(

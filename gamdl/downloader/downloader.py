@@ -81,6 +81,23 @@ class AppleMusicDownloader:
         elif media.media_metadata["type"] in {"uploaded-videos"}:
             return await self.uploaded_video.get_download_item(media)
 
+    async def raise_if_song_file_exists(self, media: AppleMusicMedia) -> None:
+        """Podfill patch: called by the interface before stream info / license
+        exchange. Raises GamdlDownloaderMediaFileExistsError when the song's
+        final file already exists (and overwrite is off), so the track is skipped
+        without spending a license request."""
+        if self.overwrite or not media.tags:
+            return
+        if media.media_metadata["type"] not in {"songs", "library-songs"}:
+            return
+        final_path = self.base.get_final_path(
+            media.tags,
+            ".m4a",
+            media.playlist_tags,
+        )
+        if Path(final_path).exists():
+            raise GamdlDownloaderMediaFileExistsError(final_path)
+
     async def download(self, item: DownloadItem) -> None:
         try:
             if item.media.error:
